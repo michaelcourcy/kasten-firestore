@@ -45,7 +45,7 @@ actions:
             dumpname="{{ .Phases.initBackup.Output.dumpname }}"
             database="{{ index .Object.data "database" | toString | b64dec }}"            
             json='{{ index .Object.data "key-file" | toString }}'
-            project_id='{{ index .Object.data "project" | toString }}'
+            project_id='{{ index .Object.data "project" | toString | b64dec }}'
             echo $json | base64 -d > /tmp/firestore-sa.json            
             gcloud auth activate-service-account --key-file=/tmp/firestore-sa.json
             gcloud config set project $project_id
@@ -72,7 +72,7 @@ actions:
             database="{{ index .Object.data "database" | toString | b64dec }}"            
             json='{{ index .Object.data "key-file" | toString }}'
             echo $json | base64 -d > /tmp/firestore-sa.json 
-            project_id='{{ index .Object.data "project" | toString }}'
+            project_id='{{ index .Object.data "project" | toString | b64dec }}'
             gcloud auth activate-service-account --key-file=/tmp/firestore-sa.json
             gcloud config set project $project_id
             gcloud import $dumpname --database=$database
@@ -97,7 +97,7 @@ actions:
             dumpname="{{ .ArtifactsIn.cloudObject.KeyValue.dumpname }}"
             json='{{ index .Object.data "key-file" | toString }}'
             echo $json | base64 -d > /tmp/firestore-sa.json 
-            project_id='{{ index .Object.data "project" | toString }}'
+            project_id='{{ index .Object.data "project" | toString | b64dec}}'
             gcloud auth activate-service-account --key-file=/tmp/firestore-sa.json
             gcloud config set project $project_id
             gsutil rm -r $dumpname           
