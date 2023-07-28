@@ -1,0 +1,11 @@
+title: kasten-bucket
+description: Kasten permissions to access and write to a bucket
+stage: GA
+includedPermissions:
+- storage.buckets.get
+- storage.objects.create
+- storage.objects.delete
+- storage.objects.get
+- storage.objects.getIamPolicy
+- storage.objects.list
+- storage.objects.update

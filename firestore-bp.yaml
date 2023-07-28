@@ -1,0 +1,103 @@
+apiVersion: cr.kanister.io/v1alpha1
+kind: Blueprint
+metadata:
+  name: firestore-bp
+  namespace: kasten-io
+actions:
+  backup: 
+    outputArtifacts:
+      cloudObject:
+        keyValue:
+          dumpname: "{{ .Phases.initBackup.Output.dumpname }}"             
+    phases:
+    - func: KubeTask
+      name: initBackup
+      args:
+        image: ghcr.io/kanisterio/kanister-kubectl-1.18:0.93.0
+        command:
+          - sh
+          - -o
+          - errexit
+          - -o
+          - pipefail
+          - -c
+          - |
+            database="{{ index .Object.data "database" | toString | b64dec }}"
+            bucket="{{ index .Object.data "bucket" | toString | b64dec }}"
+            bucket_prefix=backup/firestore/$database
+            dumpdate="{{ toDate "2006-01-02T15:04:05.999999999Z07:00" .Time | date "2006-01-02T15:04:05Z07:00" | toString | replace ":" "-" | lower }}"
+            dumpname="gs://$bucket/$bucket_prefix/$dumpdate"            
+            kando output dumpname $dumpname  
+            sleep 3               
+    - func: KubeTask
+      name: databaseBackup  
+      args:
+        image: google/cloud-sdk:slim
+        command:
+          - /bin/bash
+          - -o
+          - errexit
+          - -o
+          - pipefail
+          - -x
+          - -c
+          - |
+            dumpname="{{ .Phases.initBackup.Output.dumpname }}"
+            database="{{ index .Object.data "database" | toString | b64dec }}"            
+            json='{{ index .Object.data "key-file" | toString }}'
+            project_id='{{ index .Object.data "project" | toString }}'
+            echo $json | base64 -d > /tmp/firestore-sa.json            
+            gcloud auth activate-service-account --key-file=/tmp/firestore-sa.json
+            gcloud config set project $project_id
+            gcloud firestore export --database=$database $dumpname 
+
+  restore:    
+    inputArtifactNames:
+    - cloudObject          
+    phases:
+    - func: KubeTask
+      name: dumpRestore
+      args:
+        image: google/cloud-sdk:slim
+        command:
+          - /bin/bash
+          - -o
+          - errexit
+          - -o
+          - pipefail
+          - -x
+          - -c
+          - |
+            dumpname="{{ .ArtifactsIn.cloudObject.KeyValue.dumpname }}"            
+            database="{{ index .Object.data "database" | toString | b64dec }}"            
+            json='{{ index .Object.data "key-file" | toString }}'
+            echo $json | base64 -d > /tmp/firestore-sa.json 
+            project_id='{{ index .Object.data "project" | toString }}'
+            gcloud auth activate-service-account --key-file=/tmp/firestore-sa.json
+            gcloud config set project $project_id
+            gcloud import $dumpname --database=$database
+
+  delete:    
+    inputArtifactNames:
+    - cloudObject          
+    phases:
+    - func: KubeTask
+      name: dumpDelete
+      args:
+        image: google/cloud-sdk:slim
+        command:
+          - /bin/bash
+          - -o
+          - errexit
+          - -o
+          - pipefail
+          - -x
+          - -c
+          - |
+            dumpname="{{ .ArtifactsIn.cloudObject.KeyValue.dumpname }}"
+            json='{{ index .Object.data "key-file" | toString }}'
+            echo $json | base64 -d > /tmp/firestore-sa.json 
+            project_id='{{ index .Object.data "project" | toString }}'
+            gcloud auth activate-service-account --key-file=/tmp/firestore-sa.json
+            gcloud config set project $project_id
+            gsutil rm -r $dumpname           
